@@ -87,6 +87,38 @@ export async function llmJson(prompt: string, tools?: ToolSpec[], exec?: ToolExe
   return null;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Parse a retry delay (seconds) from a Retry-After header or an error message
+// like "Please try again in 18.6s" / "retryDelay":"41s". Capped so we never
+// stall the request for too long.
+function retryDelayMs(res: Response, bodyText: string): number {
+  const header = Number(res.headers.get('retry-after'));
+  if (isFinite(header) && header > 0) return Math.min(header, 20) * 1000;
+  const m = bodyText.match(/(?:try again in|retryDelay"?\s*:?\s*"?)\s*([\d.]+)\s*s/i);
+  const secs = m ? Number(m[1]) : 0;
+  return Math.min(secs > 0 ? secs : 4, 20) * 1000;
+}
+
+// POST a chat-completions request, retrying transient 429/503 with backoff.
+async function chatFetch(info: LlmInfo, body: any, maxRetries = 4): Promise<Response> {
+  let res!: Response;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    res = await fetch(`${info.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(info.apiKey ? { authorization: `Bearer ${info.apiKey}` } : {}) },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(90000),
+    });
+    if (res.ok || (res.status !== 429 && res.status !== 503) || attempt === maxRetries) return res;
+    const text = await res.clone().text();
+    const wait = retryDelayMs(res, text);
+    if (process.env.LLM_DEBUG) console.error(`[llm] HTTP ${res.status}, retry ${attempt + 1}/${maxRetries} in ${wait}ms`);
+    await sleep(wait);
+  }
+  return res;
+}
+
 async function openaiAgent(info: LlmInfo, prompt: string, tools?: ToolSpec[], exec?: ToolExecutor): Promise<any | null> {
   const messages: any[] = [
     { role: 'system', content: SYSTEM },
@@ -99,12 +131,7 @@ async function openaiAgent(info: LlmInfo, prompt: string, tools?: ToolSpec[], ex
   for (let iter = 0; iter < 8; iter++) {
     const body: any = { model: info.model, temperature: 0, messages };
     if (toolDefs) { body.tools = toolDefs; body.tool_choice = 'auto'; }
-    const res = await fetch(`${info.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...(info.apiKey ? { authorization: `Bearer ${info.apiKey}` } : {}) },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(90000),
-    });
+    const res = await chatFetch(info, body);
     if (!res.ok) {
       const bodyText = await res.text();
       if (process.env.LLM_DEBUG) console.error(`[llm] HTTP ${res.status}: ${bodyText.slice(0, 300)}`);
@@ -151,12 +178,7 @@ async function openaiAgentNoTools(info: LlmInfo, prompt: string): Promise<any | 
 }
 
 async function openaiFinal(info: LlmInfo, messages: any[]): Promise<any | null> {
-  const res = await fetch(`${info.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(info.apiKey ? { authorization: `Bearer ${info.apiKey}` } : {}) },
-    body: JSON.stringify({ model: info.model, temperature: 0, messages }),
-    signal: AbortSignal.timeout(90000),
-  });
+  const res = await chatFetch(info, { model: info.model, temperature: 0, messages });
   if (!res.ok) return null;
   const data: any = await res.json();
   return extractJson(data?.choices?.[0]?.message?.content ?? '');
