@@ -169,8 +169,11 @@ export async function explainFailure(input: ExplainInput): Promise<{ explanation
     badJson = false;
 
     const reads = Array.isArray(obj.reads) ? obj.reads.slice(0, 8) : [];
-    const concluding = obj.done || typeof obj.summary === 'string';
-    if (!force && reads.length && !concluding) {
+    // The model often emits empty placeholder answer fields ("summary":"", …)
+    // while still asking for reads with done:false. Only treat a NON-EMPTY
+    // summary as a conclusion, and always run pending reads unless done:true.
+    const hasAnswer = typeof obj.summary === 'string' && obj.summary.trim().length > 0;
+    if (!force && reads.length && obj.done !== true) {
       for (const r of reads) {
         try {
           const out = await exec('read_contract', { address: r.address, signature: r.signature, args: r.args ?? [] });
@@ -181,6 +184,7 @@ export async function explainFailure(input: ExplainInput): Promise<{ explanation
       }
       continue; // feed results back
     }
+    const concluding = obj.done === true || hasAnswer;
     if (concluding) { parsed = obj; break; }
     if (force) { parsed = obj; break; } // accept whatever we have on the last round
     // obj had neither reads nor a conclusion — nudge it to conclude next round
