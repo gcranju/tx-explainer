@@ -1,0 +1,22 @@
+{
+  "name": "tx-explainer-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "analyze": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.2.0",
+    "@fastify/cors": "^10.0.1",
+    "viem": "^2.21.0",
+    "@anthropic-ai/sdk": "^0.71.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.0"
+  }
+}

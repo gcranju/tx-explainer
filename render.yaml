@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: tx-explainer-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    # --include=dev so tsx/typescript install even if NODE_ENV=production.
+    buildCommand: npm install --include=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      # Set this in the Render dashboard (Environment tab) — do not commit the key.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Optional overrides; defaults live in the code.
+      - key: SONIC_RPC_URL
+        sync: false
+      - key: SONICSCAN_API_KEY
+        sync: false
