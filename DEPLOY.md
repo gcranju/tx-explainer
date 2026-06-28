@@ -21,9 +21,12 @@ gh repo create tx-explainer --private --source=. --push   # or create the repo i
 1. Go to https://dashboard.render.com → **New** → **Blueprint**.
 2. Connect the repo. Render reads [render.yaml](render.yaml) and creates the
    `tx-explainer-backend` web service.
-3. In the service's **Environment** tab, set:
-   - `ANTHROPIC_API_KEY` — required
+3. In the service's **Environment** tab, set an LLM provider (any free
+   OpenAI-compatible endpoint — enables the tool-use loop):
+   - `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` — e.g. Groq:
+     `https://api.groq.com/openai/v1` + `llama-3.3-70b-versatile` + `gsk_...`
    - `SONIC_RPC_URL`, `SONICSCAN_API_KEY` — optional overrides
+   - (Without any LLM config the app still runs but skips the LLM explanation.)
 4. Deploy. Copy the resulting URL, e.g. `https://tx-explainer-backend.onrender.com`.
 5. Verify: `curl https://<your-backend>.onrender.com/health`
 

@@ -9,8 +9,17 @@ services:
     startCommand: npm start
     healthCheckPath: /health
     envVars:
-      # Set this in the Render dashboard (Environment tab) — do not commit the key.
-      - key: ANTHROPIC_API_KEY
+      # LLM provider — use any free OpenAI-compatible endpoint (tool-use enabled).
+      # Set these in the Render dashboard (Environment tab); do not commit keys.
+      # Free quick-starts:
+      #   Groq:       LLM_BASE_URL=https://api.groq.com/openai/v1                          LLM_MODEL=llama-3.3-70b-versatile
+      #   Gemini:     LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai LLM_MODEL=gemini-2.0-flash
+      #   OpenRouter: LLM_BASE_URL=https://openrouter.ai/api/v1                            LLM_MODEL=meta-llama/llama-3.3-70b-instruct:free
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: LLM_API_KEY
         sync: false
       # Optional overrides; defaults live in the code.
       - key: SONIC_RPC_URL
